@@ -1,21 +1,24 @@
-import os
 import json
-import requests
+import os
 import logging
 from collections import defaultdict
 from tqdm import tqdm
+import requests
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configuración del log
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 # Token de GitHub
 GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
-headers = {
+HEADERS = {
     'Authorization': f'token {GITHUB_TOKEN}',
     'Accept': 'application/vnd.github.v3+json'
 }
 
-# Tags por palabra clave
+# Palabras clave por tipo de tag
 KEYWORDS = {
     'testing': ['test', 'testing', 'ci', 'unit', 'integration'],
     'fix': ['fix', 'bug', 'error', 'fail'],
@@ -27,7 +30,6 @@ KEYWORDS = {
     'obsolete': ['obsolete', 'deprecated', 'remove']
 }
 
-# Auxiliar: extraer tags de texto
 def extract_tags(text):
     tags = set()
     text = text.lower()
@@ -36,7 +38,6 @@ def extract_tags(text):
             tags.add(tag)
     return tags
 
-# Auxiliar: detectar feature en una ruta
 def detect_features_from_path(file_path, valid_features):
     parts = file_path.split('/')
     for part in parts:
@@ -44,105 +45,84 @@ def detect_features_from_path(file_path, valid_features):
             return part
     return None
 
-# Obtener archivos de un commit
-def get_commit_files(owner, repo, sha):
-    url = f'https://api.github.com/repos/{owner}/{repo}/commits/{sha}'
-    r = requests.get(url, headers=headers)
-    if r.status_code == 200:
-        return [f['filename'] for f in r.json().get('files', [])]
-    return []
-
-# Obtener archivos de un PR
-def get_pull_files(owner, repo, number):
-    files = []
-    page = 1
-    while True:
-        url = f'https://api.github.com/repos/{owner}/{repo}/pulls/{number}/files?page={page}&per_page=100'
-        r = requests.get(url, headers=headers)
-        if r.status_code != 200:
-            break
-        data = r.json()
-        if not data:
-            break
-        files += [f['filename'] for f in data]
-        page += 1
-    return files
-
-# Obtener features desde app/modules
 def get_valid_features_from_repo(owner, repo):
     url = f'https://api.github.com/repos/{owner}/{repo}/contents/app/modules'
-    r = requests.get(url, headers=headers)
-    if r.status_code != 200:
-        logging.warning(f"⚠️ No se pudo acceder a app/modules para {owner}/{repo}")
+    response = requests.get(url, headers=HEADERS)
+    if response.status_code != 200:
+        logging.warning(f"⚠️  No se pudo acceder a app/modules para {owner}/{repo}")
         return set()
-    contents = r.json()
+    contents = response.json()
     return {item['name'] for item in contents if item['type'] == 'dir'}
 
-# === PROCESAR TODOS LOS FORKS ===
-traceability_map = []
+# Procesamiento de todos los forks
+with open('forks.json') as f:
+    forks = json.load(f)
 
-for fork_folder in tqdm(os.listdir('evaluation'), desc="Procesando forks"):
-    fork_path = os.path.join('evaluation', fork_folder)
-    if not os.path.isdir(fork_path):
+for entry in tqdm(forks, desc="Procesando forks"):
+    repo_csv = entry['repo']
+    repo_full = repo_csv.replace('.csv', '')
+    owner, repo = repo_full.split('/')
+    folder_name = f"{owner}#{repo}"
+    folder = os.path.join('evaluation', folder_name)
+
+    commits_file = os.path.join(folder, 'commits.json')
+    issues_file = os.path.join(folder, 'issues.json')
+    pulls_file = os.path.join(folder, 'pulls.json')
+
+    if not all(os.path.exists(f) for f in [commits_file, issues_file, pulls_file]):
+        logging.warning(f"⚠️  Archivos no encontrados para {repo_full}")
         continue
 
-    try:
-        owner, repo = fork_folder.split('#')
-    except ValueError:
-        logging.warning(f"❌ Carpeta mal nombrada: {fork_folder}")
-        continue
-
-    # Cargar archivos JSON
-    try:
-        with open(os.path.join(fork_path, 'commits.json')) as f:
-            commits = json.load(f)
-        with open(os.path.join(fork_path, 'issues.json')) as f:
-            issues = json.load(f)
-        with open(os.path.join(fork_path, 'pulls.json')) as f:
-            pulls = json.load(f)
-    except FileNotFoundError:
-        logging.warning(f"⚠️ Archivos JSON faltantes en {fork_folder}")
-        continue
+    with open(commits_file) as f:
+        commits = json.load(f)
+    with open(issues_file) as f:
+        issues = json.load(f)
+    with open(pulls_file) as f:
+        pulls = json.load(f)
 
     valid_features = get_valid_features_from_repo(owner, repo)
+    logging.info(f"✅ Features detectadas en {repo}: {sorted(valid_features)}")
 
-    # --- Commits ---
+    traceability_map = []
+
     for commit in commits:
         sha = commit.get('sha')
         message = commit.get('commit', {}).get('message', '')
         tags = extract_tags(message)
-        files = get_commit_files(owner, repo, sha)
+        files = [f['filename'] for f in commit.get('files', [])] if 'files' in commit else []
+        timestamp = commit.get('commit', {}).get('author', {}).get('date')
         features = {detect_features_from_path(f, valid_features) for f in files}
         for feature in features:
-            if not feature: continue
-            for tag in tags:
-                traceability_map.append([feature, 'commit', tag, fork_folder, commit['commit']['committer']['date']])
+            if feature:
+                for tag in tags:
+                    traceability_map.append([feature, 'commit', tag, timestamp])
 
-    # --- Issues ---
     for issue in issues:
         title = issue.get('title', '')
         tags = extract_tags(title)
         labels = issue.get('labels', [])
         features = {label['name'] for label in labels if label['name'] in valid_features}
+        timestamp = issue.get('created_at')
         for feature in features:
             for tag in tags:
-                traceability_map.append([feature, 'issue', tag, fork_folder, issue['created_at']])
+                traceability_map.append([feature, 'issue', tag, timestamp])
 
-    # --- Pull Requests ---
     for pr in pulls:
         number = pr.get('number')
         title = pr.get('title', '')
         tags = extract_tags(title)
-        files = get_pull_files(owner, repo, number)
+        files = [f['filename'] for f in pr.get('files', [])] if 'files' in pr else []
+        timestamp = pr.get('created_at')
         features = {detect_features_from_path(f, valid_features) for f in files}
         for feature in features:
-            if not feature: continue
-            for tag in tags:
-                traceability_map.append([feature, 'pull_request', tag, fork_folder, pr['created_at']])
+            if feature:
+                for tag in tags:
+                    traceability_map.append([feature, 'pull_request', tag, timestamp])
 
-# Guardar resultado global
-os.makedirs('evaluation', exist_ok=True)
-with open('evaluation/traceability_map.json', 'w') as f:
-    json.dump(traceability_map, f, indent=2)
+    traceability_map = list(set(tuple(t) for t in traceability_map))
 
-logging.info(f"✅ Mapa de trazabilidad global generado con {len(traceability_map)} entradas.")
+    output_path = os.path.join(folder, 'traceability_map.json')
+    with open(output_path, 'w') as f:
+        json.dump(traceability_map, f, indent=2)
+
+    logging.info(f"✅ {len(traceability_map)} tuplas escritas en {output_path}")
