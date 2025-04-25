@@ -4,7 +4,7 @@ from collections import Counter, defaultdict
 import os
 
 # Load the feedback log
-with open("feedback_log.json") as f:
+with open("feedback_log_anonymous.json") as f:
     feedback_log = json.load(f)
 
 # Group by tag
