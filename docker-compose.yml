@@ -1,0 +1,9 @@
+services:
+  feedback:
+    image: feedback_analysis_splc
+    container_name: feedback_artifact
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    tty: true

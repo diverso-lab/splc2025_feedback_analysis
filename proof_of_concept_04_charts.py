@@ -66,7 +66,7 @@ def generate_chart(question_key, tags):
     plt.figure(figsize=(10, 5))
     plt.bar(features, counts)
     plt.title(TITLES[question_key])
-    plt.ylabel('Ocurrencias')
+    plt.ylabel('ocurrencies')
     plt.xlabel('Feature')
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()

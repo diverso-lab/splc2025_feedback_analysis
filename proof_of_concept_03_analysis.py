@@ -22,7 +22,7 @@ def print_section(title):
 def print_feature_list(title, tag):
     print_section(title)
     for feature, count in tag_feature_count[tag].most_common():
-        print(f"- {feature}: {count} ocurrencias")
+        print(f"- {feature}: {count} ocurrencies")
 
 def print_composite_section(title, tags):
     print_section(title)
@@ -31,7 +31,7 @@ def print_composite_section(title, tags):
         for feature, count in tag_feature_count[tag].items():
             score[feature] += count
     for feature, count in score.most_common():
-        print(f"- {feature}: {count} ocurrencias ({', '.join(set(feature_tags[feature]) & set(tags))})")
+        print(f"- {feature}: {count} ocurrencies ({', '.join(set(feature_tags[feature]) & set(tags))})")
 
 # ===============================
 # RESPUESTAS A LAS PREGUNTAS
