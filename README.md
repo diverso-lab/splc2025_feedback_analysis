@@ -1,6 +1,6 @@
 # 🧠 Feedback Analysis for SPL Forks (SPLC 2025)
 
-This repository contains the scripts and tooling used for analyzing technical feedback in fork-based software product line (SPL) developments. It accompanies the research article *"Feedback Analysis in Software Product Line Forked Developments"*, submitted to SPLC 2025.
+This repository contains the scripts and tooling used for analyzing technical feedback in fork-based software product line (SPL) developments. It accompanies the paper *"Feedback Analysis in Software Product Line Forked Developments"*, accepted at SPLC 2025.
 
 The analysis covers:
 - Extraction of commits, issues, and pull requests from GitHub forks.
@@ -9,88 +9,133 @@ The analysis covers:
 - Aggregation of traceability tuples into a unified **feedback log**.
 - High-level visual and textual analysis.
 
-## 🔐 How to Get a GitHub Personal Access Token
+---
 
-1. Go to [https://github.com/settings/tokens](https://github.com/settings/tokens)
-2. Click **"Generate new token"** → choose **"Classic token"**
-3. Fill in:
-   - **Note**: name your token (e.g., `VSCode`)
-   - **Expiration**: set duration
-   - **Scopes**: check `repo` scope.
-4. Click **"Generate token"**
-5. **Copy the token immediately!** You won’t be able to see it again.
+## 🐳 Docker Usage (Recommended)
 
-## 📦 Installation
-
-Clone the repository and set up a virtual environment with Python 3.12:
+We provide a ready-to-use Docker image:
 
 ```bash
+docker pull drorganvidez/splc-feedback-artifact:latest
+```
+
+Make sure to provide your GitHub Personal Access Token in a `.env` file:
+
+```bash
+echo "GITHUB_TOKEN=your_token_here" > .env
+```
+
+Then run the container:
+
+```bash
+docker run --rm -it \
+  --env-file .env \
+  -v "$PWD":/app \
+  drorganvidez/splc-feedback-artifact:latest
+```
+
+Once inside the container, you can run any step of the pipeline as usual:
+
+```bash
+python evaluation_03_feedback_log.py
+python evaluation_04_analysis.py
+```
+
+---
+
+## 🔧 Manual Setup (Python 3.12)
+
+```bash
+git clone https://github.com/diverso-lab/splc2025_feedback_analysis
+cd splc2025_feedback_analysis
+
 python3.12 -m venv venv
 source venv/bin/activate
-```
 
-Install the dependencies:
-
-```bash
 pip install -r requirements.txt
-```
-
-Then export your GitHub token as an environment variable:
-
-```bash
 cp .env.example .env
 source .env
 ```
 
-## 🧪 Running the evaluation
-The pipeline is divided into four steps:
+---
 
-### Data Collection (Evaluation 01)
-Collects commits, issues, and pull requests for all forks listed in forks.json. Results are saved in evaluation/<fork_id>/.
+## 🧪 Pipeline Overview
+
+The full pipeline consists of 4 steps. You can run steps 3–4 directly using the included data, or perform the full analysis from scratch.
+
+### 🟢 Step 1: Data Collection
+Collect commits, issues, and PRs from all forks in `forks.json`:
 
 ```bash
 python evaluation_01_data_source.py
 ```
 
-### Traceability Map Construction (Evaluation 02)
-Processes each fork's data to build traceability tuples of the form:
-
-```
-(feature, source_type, tag, timestamp)
-```
-Saved as traceability_map.json inside each fork's folder.
-
-```bash
-python evaluation_02_data_processing.py
-```
-
-### Feedback Log Generation (Evaluation 03)
-Aggregates all traceability maps into a unified feedback_log.json, including the fork name and timestamp:
+### 🟡 Step 2: Traceability Mapping
+Generate tuples of the form:
 
 ```
 (feature, source_type, tag, fork, timestamp)
 ```
 
-Run this script:
+```bash
+python evaluation_02_data_processing.py
+```
+
+### 🔵 Step 3: Feedback Log Generation
+Aggregate all data into `feedback_log.json`:
 
 ```bash
 python evaluation_03_feedback_log.py
 ```
 
-### Global Analysis and Visualization (Evaluation 04)
-Performs quantitative and visual analysis from feedback_log.json, including bar charts grouped by semantic categories (e.g., "features with most failures", "features under test", etc.).
+### 🟣 Step 4: Analysis and Visualization
+Create summaries and figures:
 
 ```bash
 python evaluation_04_analysis.py
 python evaluation_05_visuals.py
 ```
 
-## Output
-`feedback_log.json`: Consolidated analysis data.
+---
 
-`figures/*.svg and *.png`: Visual summaries for inclusion in the paper.
+## 🧪 Proof of Concept
 
-Textual summaries printed to console.
+A minimal demo is available for testing purposes:
+
+```bash
+python proof_of_concept_01_data_source.py
+python proof_of_concept_02_data_processing.py
+python proof_of_concept_03_analysis.py
+python proof_of_concept_04_charts.py
+```
+
+This version uses synthetic data and does not require a GitHub token.
+
+---
+
+## 🔐 GitHub Token Setup
+
+1. Go to [https://github.com/settings/tokens](https://github.com/settings/tokens)
+2. Click **"Generate new token"** → choose **"Classic token"**
+3. Select scope: `repo`
+4. Save the token and add it to a file:
+
+```bash
+echo "GITHUB_TOKEN=your_token_here" > .env
+```
+
+---
+
+## 📦 Outputs
+
+- `feedback_log.json`: Aggregated feedback tuples.
+- `figures/*.svg` and `*.png`: Visual output for publication.
+- Console summaries.
+
+---
 
 ## 📚 Citation
-If you find this useful, please cite our upcoming paper (to be updated after acceptance).
+
+To cite this artifact, please reference:
+
+> D. Romero-Organvidez, O. Díaz, Y. Tang, D. Benavides. *Feedback Analysis in Software Product Line Forked Developments*. Artifact paper. SPLC 2025. A Coruña, Spain.
